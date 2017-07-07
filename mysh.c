@@ -60,22 +60,28 @@ int main(int argc, char *argv[]){
 	 command_status = 3 : 何もしない */
 	int isscript = 0;
 
-	if(isatty(fileno(stdin)) == 0){
+/*	if(isatty(fileno(stdin)) == 0){
 		if(errno == ENOTTY){
 			isscript = 1;
+			printf("script\n");
 		}
-	}
+	}*/
 
 	for(;;){
-		if(!isscript){ //スクリプト実行中でなければ
+/*		if(!isscript){ //スクリプト実行中でなければ
 			printf("%s", prompt); //プロンプトを表示する
-		}
+		}*/
+
+		printf("%s", prompt); //プロンプトを表示する
 
 		// 標準入力から１行を command_buffer へ読み込む
 		// 入力が何もなければスクリプトの終わりなのでループ脱出
 		if(fgets(command_buffer, BUFLEN, stdin) == NULL){
+			printf("break\n");
 			break;
 		}
+
+		//printf("test %s",command_buffer);
 
 		//  入力されたバッファ内のコマンドを解析する
 		//  返り値はコマンドの状態
@@ -357,7 +363,8 @@ void execute_command(char *args[], int command_status){
 
 	if(pid == 0){
 		execvp(args[0], args);
-		printf("Command not found\n"); //NOTREACHED
+		//NOTFOUND
+		printf("Command not found\n");
 		exit(1);
 	}
 
@@ -551,11 +558,16 @@ void change_prompt(char arg[]){
 }
 
 void alias(char *args[]){
-	ALIAS *tmp;
+	ALIAS *tmp,*end=aliashead;
 	if(args[1] == NULL){
+		if(aliashead==NULL){
+			printf("no alias\n");
+			return;
+		}
 		tmp = aliashead;
 		while(tmp != NULL){
 			printf("%s %s\n", tmp->command1, tmp->command2);
+			tmp=tmp->next;
 		}
 		return;
 	}
@@ -571,11 +583,14 @@ void alias(char *args[]){
 		strcpy(aliashead->command2, args[2]);
 		aliashead->next = NULL;
 	}else{
+		while(end->next!=NULL){
+			end++;
+		}
 		tmp = malloc(sizeof(ALIAS));
 		strcpy(tmp->command1, args[1]);
 		strcpy(tmp->command2, args[2]);
 		tmp->next = NULL;
-
+		end->next=tmp;
 	}
 }
 
@@ -596,7 +611,7 @@ void unalias(char arg[]){
 		tmp = tmp->next;
 	}
 	//NOTFOUND
-	printf("No such alias\n");
+	printf("unalias: %s: not found\n",arg);
 }
 
 char* search_alias(char arg[]){
