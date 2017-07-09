@@ -48,6 +48,10 @@ void change_prompt(char[]);
 void alias(char*[]);
 void unalias(char[]);
 char* search_alias(char[]);
+void word_count(char[]);
+void sort(char[]);
+void sort_line(char*[], int, int);
+void swap(char*[], int, int);
 void clean(void);
 
 int main(int argc, char *argv[]){
@@ -63,27 +67,21 @@ int main(int argc, char *argv[]){
 	if(isatty(fileno(stdin)) == 0){
 		if(errno == ENOTTY){
 			isscript = 1;
-			printf("script\n");
 		}
 	}
 
 	for(;;){
-		/*if(!isscript){ //スクリプト実行中でなければ
-		 	 printf("%s", prompt); //プロンプトを表示する
-		 }*/
+		if(!isscript){ //スクリプト実行中でなければ
+			printf("%s", prompt); //プロンプトを表示する
+		}
 
-		printf("%s", prompt); //プロンプトを表示する
+
 
 		// 標準入力から１行を command_buffer へ読み込む
 		// 入力が何もなければスクリプトの終わりなのでループ脱出
 		if(fgets(command_buffer, BUFLEN, stdin) == NULL){
-			printf("break\n");
 			break;
 		}
-
-		printf("input : %s\n",command_buffer);
-
-		//printf("test %s",command_buffer);
 
 		//  入力されたバッファ内のコマンドを解析する
 		//  返り値はコマンドの状態
@@ -333,8 +331,8 @@ void execute_command(char *args[], int command_status){
 
 	//myshに存在するコマンドならそちらを実行する
 
-	for(int i=0;args[i]!=NULL;++i){
-		printf("args[%d]:%s\n",i,args[i]);
+	for(int i = 0; args[i] != NULL; ++i){
+		printf("args[%d]:%s\n", i, args[i]);
 	}
 	if(execute_native_command(args, command_status)){
 		return;
@@ -348,7 +346,7 @@ void execute_command(char *args[], int command_status){
 
 	pid = fork();
 	if(pid < 0){
-		printf("プロセスが生成できませんでした\n");
+		printf("Cannot create process\n");
 		exit(1);
 	}
 
@@ -423,6 +421,14 @@ int execute_native_command(char *args[], int command_status){
 		unalias(args[1]);
 		return 1;
 	}
+	if(strcmp(args[0], "wc") == 0){
+		word_count(args[1]);
+		return 1;
+	}
+	if(strcmp(args[0], "sort") == 0){
+		sort(args[1]);
+		return 1;
+	}
 
 	return 0;
 }
@@ -449,23 +455,27 @@ void change_directory(char dir[]){
 void push_directory(void){
 	char dir[DIRSIZE];
 	STACK *tmp;
-	getcwd(dir, DIRSIZE);
 	if(dirhead == NULL){
 		dirhead = malloc(sizeof(STACK));
-		strcpy(dirhead->dir, dir);
+		getcwd(dirhead->dir, DIRSIZE);
 		dirhead->next = NULL;
-		printf("Pushed directory %s\n", dir);
+		printf("Pushed directory %s\n", dirhead->dir);
 		return;
 	}
 
 	tmp = malloc(sizeof(STACK));
-	strcpy(tmp->dir, dir);
+	getcwd(tmp->dir, DIRSIZE);
 	tmp->next = dirhead;
 	dirhead = tmp;
-	printf("Pushed directory %s\n", dir);
+	printf("Pushed directory %s\n", dirhead->dir);
 }
 
 void dirs(void){
+	if(dirhead == NULL){
+		printf("No directories in stack\n");
+		return;
+	}
+
 	STACK *tmp = dirhead;
 	while(NULL != tmp){
 		printf("%s\n", tmp->dir);
@@ -481,7 +491,7 @@ void pop_directory(void){
 	}
 
 	chdir(dirhead->dir);
-	printf("Pushed directory %s\n", dirhead->dir);
+	printf("Poped directory %s\n", dirhead->dir);
 	tmp = dirhead->next;
 	free(dirhead);
 	dirhead = tmp;
@@ -623,6 +633,96 @@ char* search_alias(char arg[]){
 	}
 	//NOTFOUND
 	return arg;
+}
+
+void word_count(char filename[]){
+	int i;
+	int prev = 0;
+	int lines = 0;
+	int words = 0;
+	int bytes = 0;
+	char line[1024];
+	FILE *fp = fopen(filename, "r");
+
+	if(fp == NULL){
+		printf("Cannot open file %s", filename);
+		return;
+	}
+
+	while(fgets(line, 1024, fp) != NULL){
+		++lines;
+		for(i = 0; line[i] != '\0'; i++){
+			if(line[i] == ' ' || line[i] == '.' || line[i] == ',' || line[i] == '\n'){
+				if(!prev){
+					++words;
+				}
+				prev = 1;
+			}else{
+				prev = 0;
+			}
+		}
+		bytes += i;
+	}
+
+	printf("%8d %8d %8d %s\n", lines, words, bytes, filename);
+}
+
+void sort(char filename[]){
+	int i;
+	char *line[1024];
+	FILE *fp = fopen(filename, "r");
+
+	if(fp == NULL){
+		printf("Cannot open file %s", filename);
+		return;
+	}
+
+	for(i = 0; i < 1024; ++i){
+		line[i] = malloc(256);
+		if(fgets(line[i], 255, fp) == NULL){
+			break;
+		}
+
+		*(line[i] + (strlen(line[i]) - 1)) = '\0';
+		puts(line[i]);
+	}
+
+	sort_line(line, 0, i - 1);
+
+	for(i = 0; line[i] != NULL; ++i){
+		puts(line[i]);
+		free(line[i]);
+	}
+}
+
+void sort_line(char *line[], int left, int right){
+	int i = left;
+	int j = right;
+	char *pivot = line[left + (right - left) / 2];
+
+	for(;;){
+		while(strcmp(line[i], pivot) < 0)
+			i++;
+		while(strcmp(line[j], pivot) > 0)
+			j--;
+		if(i >= j)
+			break;
+
+		swap(line, i, j);
+		i++;
+		j--;
+	}
+
+	if(left < i - 1)
+		sort_line(line, left, i - 1);
+	if(j + 1 < right)
+		sort_line(line, j + 1, right);
+}
+
+void swap(char *line[], int i, int j){
+	char *tmp = line[i];
+	line[i] = line[j];
+	line[j] = tmp;
 }
 
 void clean(void){
