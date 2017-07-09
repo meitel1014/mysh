@@ -33,8 +33,8 @@ STACK *dirhead = NULL;
 ALIAS *aliashead = NULL;
 
 int parse(char[], char*[]);
-int wild_card(char[],char*);
-int strcmp_r(char[],char[]);
+int wild_card(char[], char*);
+int strcmp_r(char[], char[]);
 void add_history(char[]);
 void execute_command(char*[], int);
 int execute_native_command(char*[], int);
@@ -60,17 +60,17 @@ int main(int argc, char *argv[]){
 	 command_status = 3 : 何もしない */
 	int isscript = 0;
 
-/*	if(isatty(fileno(stdin)) == 0){
+	if(isatty(fileno(stdin)) == 0){
 		if(errno == ENOTTY){
 			isscript = 1;
 			printf("script\n");
 		}
-	}*/
+	}
 
 	for(;;){
-/*		if(!isscript){ //スクリプト実行中でなければ
-			printf("%s", prompt); //プロンプトを表示する
-		}*/
+		/*if(!isscript){ //スクリプト実行中でなければ
+		 	 printf("%s", prompt); //プロンプトを表示する
+		 }*/
 
 		printf("%s", prompt); //プロンプトを表示する
 
@@ -80,6 +80,8 @@ int main(int argc, char *argv[]){
 			printf("break\n");
 			break;
 		}
+
+		printf("input : %s\n",command_buffer);
 
 		//printf("test %s",command_buffer);
 
@@ -204,92 +206,85 @@ int parse(char buffer[], char *args[]){
 //置換できたら1，できなかったら0を返す
 int wild_card(char buffer[], char *idx){
 	int i;
-	char *argidx=0;
-	char exp[BUFLEN]="";
-	char command[BUFLEN]="";
-	char args[BUFLEN]="";
+	char *argidx = 0;
+	char exp[BUFLEN] = "";
+	char command[BUFLEN] = "";
+	char args[BUFLEN] = "";
 	char key[KEYSIZE];
-	DIR *dir=opendir("./");
+	DIR *dir = opendir("./");
 	struct dirent *dent;
 
 	//bufferの*のついた引数までを一時コピー
 	strncpy(command, buffer, (int)(idx - buffer) / sizeof(char));
-	command[(int)(idx - buffer) / sizeof(char)]='\0';
+	command[(int)(idx - buffer) / sizeof(char)] = '\0';
 	//*のついた引数より後を一時コピー
-	argidx=idx;
+	argidx = idx;
 	//*のついた引数を読み飛ばす
 	while(*argidx != ' ' && *argidx != '\t'){
 		++argidx;
 	}
-	strcpy(args,argidx);
-
-	printf("copied\n");
+	strcpy(args, argidx);
 
 	if(*idx != '*'){ // strings*の場合
-		printf("in strings*\n");
 		for(i = 0; idx[i] != '*'; ++i){
-			key[i]=idx[i];
+			key[i] = idx[i];
 		}
-		key[i]='\0';
-		while((dent=readdir(dir))!=NULL){
-			if(dent->d_type==DT_REG){
-				if(strncmp(dent->d_name,key,strlen(key))==0){
-					strcat(exp,dent->d_name);
-					strcat(exp," ");
+		key[i] = '\0';
+		while((dent = readdir(dir)) != NULL){
+			if(dent->d_type == DT_REG){
+				if(strncmp(dent->d_name, key, strlen(key)) == 0){
+					strcat(exp, dent->d_name);
+					strcat(exp, " ");
 				}
 			}
 		}
-	}else if(*(idx + 1) != ' ' && *(idx + 1) != '\t'&& *(idx + 1) != '\0'){ // *stringsの場合
-		printf("in *strings\n");
+	}else if(*(idx + 1) != ' ' && *(idx + 1) != '\t' && *(idx + 1) != '\0'){ // *stringsの場合
 		for(i = 1; idx[i] != ' ' && idx[i] != '\t'; ++i){
-			key[i-1]=idx[i];
+			key[i - 1] = idx[i];
 		}
-		key[i-1]='\0';
-		printf("generated key %s\n",key);
-		while((dent=readdir(dir))!=NULL){
-			if(dent->d_type==DT_REG){
-				if(strcmp_r(dent->d_name,key)){
-					strcat(exp,dent->d_name);
-					strcat(exp," ");
+		key[i - 1] = '\0';
+		while((dent = readdir(dir)) != NULL){
+			if(dent->d_type == DT_REG){
+				if(strcmp_r(dent->d_name, key)){
+					strcat(exp, dent->d_name);
+					strcat(exp, " ");
 				}
 			}
 		}
-	}else{ // *の場合
-		printf("in *\n");
-		while((dent=readdir(dir))!=NULL){
-			if(dent->d_type==DT_REG){
-				printf("dir read %s\n",dent->d_name);
-				strcat(exp,dent->d_name);
-				strcat(exp," ");
+	}else{
+		while((dent = readdir(dir)) != NULL){
+			if(dent->d_type == DT_REG){
+				strcat(exp, dent->d_name);
+				strcat(exp, " ");
 			}
 		}
 	}
 
-	if(strcmp(exp,"")==0){
+	if(strcmp(exp, "") == 0){
 		printf("could not replace\n");
 		return 0;
 	}
 
-	printf("command=%s\n",command);
-	strcpy(buffer,command);
-	printf("exp=%s\n",exp);
-	strcat(buffer,exp);
-	printf("args=%s\n",args);
-	strcat(buffer,args);
-	printf("%s\n",buffer);
+	printf("command=%s\n", command);
+	strcpy(buffer, command);
+	printf("exp=%s\n", exp);
+	strcat(buffer, exp);
+	printf("args=%s\n", args);
+	strcat(buffer, args);
+	printf("%s\n", buffer);
 	return 1;
 }
 
 //str1の末尾がstr2と一致するか確認
 //一致すれば1,しなければ0を返す
-int strcmp_r(char *str1,char *str2){
-	if(strlen(str1)<strlen(str2)){
+int strcmp_r(char *str1, char *str2){
+	if(strlen(str1) < strlen(str2)){
 		//str1の方が短いとき一致することはない
 		return 0;
 	}
 	//str1の検索開始位置を文字数の差ぶんずらす
-	str1+=strlen(str1)-strlen(str2);
-	if(strcmp(str1,str2)==0){
+	str1 += strlen(str1) - strlen(str2);
+	if(strcmp(str1, str2) == 0){
 		return 1;
 	}else{
 		return 0;
@@ -337,6 +332,10 @@ void execute_command(char *args[], int command_status){
 	int status; /* 子プロセスの終了ステータス */
 
 	//myshに存在するコマンドならそちらを実行する
+
+	for(int i=0;args[i]!=NULL;++i){
+		printf("args[%d]:%s\n",i,args[i]);
+	}
 	if(execute_native_command(args, command_status)){
 		return;
 	}
@@ -437,7 +436,7 @@ void change_directory(char dir[]){
 	if(chdir(dir) == 0){
 		printf("Changed directory to %s\n", dir);
 	}else{
-		printf("Failed to change directory\n", dir);
+		printf("Failed to change directory to %s\n", dir);
 		if(errno == ENOENT){
 			printf("%s doesn't exist\n", dir);
 		}
@@ -558,16 +557,16 @@ void change_prompt(char arg[]){
 }
 
 void alias(char *args[]){
-	ALIAS *tmp,*end=aliashead;
+	ALIAS *tmp, *end = aliashead;
 	if(args[1] == NULL){
-		if(aliashead==NULL){
+		if(aliashead == NULL){
 			printf("no alias\n");
 			return;
 		}
 		tmp = aliashead;
 		while(tmp != NULL){
 			printf("%s %s\n", tmp->command1, tmp->command2);
-			tmp=tmp->next;
+			tmp = tmp->next;
 		}
 		return;
 	}
@@ -583,14 +582,14 @@ void alias(char *args[]){
 		strcpy(aliashead->command2, args[2]);
 		aliashead->next = NULL;
 	}else{
-		while(end->next!=NULL){
+		while(end->next != NULL){
 			end++;
 		}
 		tmp = malloc(sizeof(ALIAS));
 		strcpy(tmp->command1, args[1]);
 		strcpy(tmp->command2, args[2]);
 		tmp->next = NULL;
-		end->next=tmp;
+		end->next = tmp;
 	}
 }
 
@@ -611,7 +610,7 @@ void unalias(char arg[]){
 		tmp = tmp->next;
 	}
 	//NOTFOUND
-	printf("unalias: %s: not found\n",arg);
+	printf("unalias: %s: not found\n", arg);
 }
 
 char* search_alias(char arg[]){
