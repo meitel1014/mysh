@@ -75,8 +75,6 @@ int main(int argc, char *argv[]){
 			printf("%s", prompt); //プロンプトを表示する
 		}
 
-
-
 		// 標準入力から１行を command_buffer へ読み込む
 		// 入力が何もなければスクリプトの終わりなのでループ脱出
 		if(fgets(command_buffer, BUFLEN, stdin) == NULL){
@@ -636,12 +634,11 @@ char* search_alias(char arg[]){
 }
 
 void word_count(char filename[]){
-	int i;
 	int prev = 0;
 	int lines = 0;
 	int words = 0;
 	int bytes = 0;
-	char line[1024];
+	char c;
 	FILE *fp = fopen(filename, "r");
 
 	if(fp == NULL){
@@ -649,22 +646,27 @@ void word_count(char filename[]){
 		return;
 	}
 
-	while(fgets(line, 1024, fp) != NULL){
-		++lines;
-		for(i = 0; line[i] != '\0'; i++){
-			if(line[i] == ' ' || line[i] == '.' || line[i] == ',' || line[i] == '\n'){
+	while((c = fgetc(fp)) != NULL){
+		++bytes;
+		switch(c){
+			case '\n':
+				++lines;
+				/* no break */
+			case ' ':
+			case '.':
+			case ',':
 				if(!prev){
 					++words;
 				}
 				prev = 1;
-			}else{
+				break;
+			default:
 				prev = 0;
-			}
 		}
-		bytes += i;
 	}
 
 	printf("%8d %8d %8d %s\n", lines, words, bytes, filename);
+	fclose(fp);
 }
 
 void sort(char filename[]){
@@ -689,6 +691,7 @@ void sort(char filename[]){
 
 	sort_line(line, 0, i - 1);
 
+	fclose(fp);
 	for(i = 0; line[i] != NULL; ++i){
 		puts(line[i]);
 		free(line[i]);
