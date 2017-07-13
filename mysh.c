@@ -18,7 +18,7 @@ struct stack{
 	char dir[DIRSIZE];
 	struct stack *next;
 };
-typedef struct stack STACK;
+typedef struct stack DIRSTACK;
 
 struct pairlist{
 	char command1[KEYSIZE];
@@ -29,7 +29,7 @@ typedef struct pairlist ALIAS;
 
 char prompt[PROMPT_SIZE] = "Command : ";
 char *command_history[HISTORY_SIZE + 1] = { 0 };
-STACK *dirhead = NULL;
+DIRSTACK *dirhead = NULL;
 ALIAS *aliashead = NULL;
 
 int parse(char[], char*[]);
@@ -54,8 +54,8 @@ void sort_line(char*[], int, int);
 void swap(char*[], int, int);
 void clean(void);
 
-int main(int argc, char *argv[]){
-	char command_buffer[BUFLEN]; /* コマンド用のバッファ */
+int main(void){
+	char buffer[BUFLEN]; /* コマンド用のバッファ */
 	char *args[MAXARGNUM]; /* 引数へのポインタの配列 */
 	int command_status; /* コマンドの状態を表す
 	 command_status = 0 : フォアグラウンドで実行
@@ -77,13 +77,13 @@ int main(int argc, char *argv[]){
 
 		// 標準入力から１行を command_buffer へ読み込む
 		// 入力が何もなければスクリプトの終わりなのでループ脱出
-		if(fgets(command_buffer, BUFLEN, stdin) == NULL){
+		if(fgets(buffer, BUFLEN, stdin) == NULL){
 			break;
 		}
 
 		//  入力されたバッファ内のコマンドを解析する
 		//  返り値はコマンドの状態
-		command_status = parse(command_buffer, args);
+		command_status = parse(buffer, args);
 
 		//  終了コマンドならばループ脱出
 		//  引数が何もなければプロンプト表示へ戻る
@@ -92,6 +92,7 @@ int main(int argc, char *argv[]){
 		}else if(command_status == 3){
 			continue;
 		}
+
 		execute_command(args, command_status);		// コマンドを実行する
 	}
 
@@ -122,6 +123,10 @@ int parse(char buffer[], char *args[]){
 	int status = 0; /* コマンドの状態を表す */
 
 	*(buffer + (strlen(buffer) - 1)) = '\0'; //バッファ内の最後にある改行をヌル文字へ変更
+	char *idx = strchr(buffer, '#');// コメントを無視
+	if(idx!=NULL){
+		*idx='\0';
+	}
 
 	if(buffer[0] == '!'){ //!から始まる呼び出しをhistoryに含めないため先に実行
 		if(search_history(buffer) == 0){
@@ -140,7 +145,7 @@ int parse(char buffer[], char *args[]){
 		return status;
 	}
 
-	char *idx = strchr(buffer, '*');
+	idx = strchr(buffer, '*');
 	if(idx != NULL){
 		while(*(idx - 1) != ' ' && *(idx - 1) != '\t'){
 			--idx;
@@ -177,13 +182,12 @@ int parse(char buffer[], char *args[]){
 
 	args[arg_index] = NULL; // 最後の引数の次にはヌルへのポインタを格納する
 
+	args[0] = search_alias(args[0]);
+
 	/* 最後の引数をチェックして "&" ならば
 	 *  "&" を引数から削る
 	 *  コマンドの状態を表す status に 1 を設定する
 	 *  そうでなければ status に 0 を設定する*/
-
-	args[0] = search_alias(args[0]);
-
 	if(arg_index > 0 && strcmp(args[arg_index - 1], "&") == 0){
 		--arg_index;
 		args[arg_index] = '\0';
@@ -261,12 +265,6 @@ int wild_card(char buffer[], char *idx){
 		return 0;
 	}
 
-	printf("command=%s\n", command);
-	strcpy(buffer, command);
-	printf("exp=%s\n", exp);
-	strcat(buffer, exp);
-	printf("args=%s\n", args);
-	strcat(buffer, args);
 	printf("%s\n", buffer);
 	return 1;
 }
@@ -442,7 +440,7 @@ void change_directory(char dir[]){
 	}else{
 		printf("Failed to change directory to %s\n", dir);
 		if(errno == ENOENT){
-			printf("%s doesn't exist\n", dir);
+			printf("%s does not exist\n", dir);
 		}
 		if(errno == EACCES){
 			printf("%s :Permission denied\n", dir);
@@ -452,16 +450,16 @@ void change_directory(char dir[]){
 
 void push_directory(void){
 	char dir[DIRSIZE];
-	STACK *tmp;
+	DIRSTACK *tmp;
 	if(dirhead == NULL){
-		dirhead = malloc(sizeof(STACK));
+		dirhead = malloc(sizeof(DIRSTACK));
 		getcwd(dirhead->dir, DIRSIZE);
 		dirhead->next = NULL;
 		printf("Pushed directory %s\n", dirhead->dir);
 		return;
 	}
 
-	tmp = malloc(sizeof(STACK));
+	tmp = malloc(sizeof(DIRSTACK));
 	getcwd(tmp->dir, DIRSIZE);
 	tmp->next = dirhead;
 	dirhead = tmp;
@@ -474,7 +472,7 @@ void dirs(void){
 		return;
 	}
 
-	STACK *tmp = dirhead;
+	DIRSTACK *tmp = dirhead;
 	while(NULL != tmp){
 		printf("%s\n", tmp->dir);
 		tmp = tmp->next;
@@ -482,7 +480,7 @@ void dirs(void){
 }
 
 void pop_directory(void){
-	STACK *tmp;
+	DIRSTACK *tmp;
 	if(dirhead == NULL){
 		printf("No directories in stack\n");
 		return;
@@ -604,11 +602,12 @@ void alias(char *args[]){
 void unalias(char arg[]){
 	ALIAS *tmp = aliashead;
 	ALIAS *prev = NULL;
+
 	while(tmp->next != NULL){
 		if(strcmp(tmp->command1, arg) == 0){
-			if(prev == NULL){		//aliasheadが該当していたらaliasheadを移す必要あり
+			if(prev == NULL){ // aliasheadが該当していたらaliasheadを移す必要あり
 				aliashead = tmp->next;
-			}else{		//そうでなければつなぎ替えるだけ
+			}else{            // そうでなければつなぎ替えるだけ
 				prev->next = tmp->next;
 			}
 			free(tmp);
@@ -634,7 +633,7 @@ char* search_alias(char arg[]){
 }
 
 void word_count(char filename[]){
-	int prev = 0;
+	int prev = 0; // 前の文字が区切り文字かどうか
 	int lines = 0;
 	int words = 0;
 	int bytes = 0;
@@ -646,7 +645,7 @@ void word_count(char filename[]){
 		return;
 	}
 
-	while((c = fgetc(fp)) != NULL){
+	while((c = fgetc(fp)) != '\0'){
 		++bytes;
 		switch(c){
 			case '\n':
@@ -655,13 +654,15 @@ void word_count(char filename[]){
 			case ' ':
 			case '.':
 			case ',':
-				if(!prev){
-					++words;
+			case '\r':
+				if(!prev){ // 前の文字が区切り文字でなければ
+					++words; // 単語数を増やす
 				}
 				prev = 1;
 				break;
 			default:
 				prev = 0;
+				break;
 		}
 	}
 
@@ -670,7 +671,7 @@ void word_count(char filename[]){
 }
 
 void sort(char filename[]){
-	int i;
+	int cl;
 	char *line[1024];
 	FILE *fp = fopen(filename, "r");
 
@@ -679,21 +680,22 @@ void sort(char filename[]){
 		return;
 	}
 
-	for(i = 0; i < 1024; ++i){
-		line[i] = malloc(256);
-		if(fgets(line[i], 255, fp) == NULL){
+	for(cl = 0; cl < 1024; ++cl){
+		line[cl] = malloc(256);
+		printf("malloc\n");
+		if(fgets(line[cl], 255, fp) == NULL){
 			break;
 		}
 
-		*(line[i] + (strlen(line[i]) - 1)) = '\0';
-		puts(line[i]);
+		*(line[cl] + (strlen(line[cl]) - 1)) = '\0';
+		puts(line[cl]);
 	}
 
-	sort_line(line, 0, i - 1);
+	sort_line(line, 0, cl - 1);
 
 	fclose(fp);
-	for(i = 0; line[i] != NULL; ++i){
-		puts(line[i]);
+	for(int i = 0; line[i] != NULL; ++i){
+		//puts(line[i]);
 		free(line[i]);
 	}
 }
@@ -708,18 +710,21 @@ void sort_line(char *line[], int left, int right){
 			i++;
 		while(strcmp(line[j], pivot) > 0)
 			j--;
-		if(i >= j)
+		if(i >= j){
 			break;
+		}
 
 		swap(line, i, j);
 		i++;
 		j--;
 	}
 
-	if(left < i - 1)
+	if(left < i - 1){
 		sort_line(line, left, i - 1);
-	if(j + 1 < right)
+	}
+	if(j + 1 < right){
 		sort_line(line, j + 1, right);
+	}
 }
 
 void swap(char *line[], int i, int j){
@@ -729,17 +734,19 @@ void swap(char *line[], int i, int j){
 }
 
 void clean(void){
-	int i;
-	STACK *tmp1;
+	DIRSTACK *tmp1;
 	ALIAS *tmp2;
+
 	while(NULL != dirhead){
 		tmp1 = dirhead->next;
 		free(dirhead);
 		dirhead = tmp1;
 	}
-	for(i = 0; i < HISTORY_SIZE; ++i){
+
+	for(int i = 0; i < HISTORY_SIZE; ++i){
 		free(command_history[i]);
 	}
+
 	while(NULL != aliashead){
 		tmp2 = aliashead->next;
 		free(aliashead);
