@@ -5,32 +5,39 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <errno.h>
 
-#define BUFLEN    1024     /* コマンド用のバッファの大きさ */
-#define MAXARGNUM  256     /* 最大の引数の数 */
+#define BUFLEN     1024     /* コマンド用のバッファの大きさ */
+#define MAXARGNUM   256     /* 最大の引数の数 */
 #define HISTORY_SIZE 32
-#define DIRSIZE 256
-#define PROMPT_SIZE 64
-#define KEYSIZE 32
+#define DIRSIZE     256
+#define PROMPT_SIZE  64
+#define KEYSIZE      32
+#define COMMANDS      9
 
-struct stack{
+const char *NATIVE_COMMANDS[COMMANDS] =
+		{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
+enum commands{
+	CD, PUSHD, DIRS, POPD, HISTORY, PROMPT, ALIAS, UNALIAS, TYPE
+};
+
+typedef struct stack{
 	char dir[DIRSIZE];
 	struct stack *next;
-};
-typedef struct stack DIRSTACK;
+} DIRSTACK;
 
-struct pairlist{
+typedef struct pairlist{
 	char command1[KEYSIZE];
 	char command2[KEYSIZE];
 	struct pairlist *next;
-};
-typedef struct pairlist ALIAS;
+} ALIASLIST;
 
 char prompt[PROMPT_SIZE] = "Command : ";
 char *command_history[HISTORY_SIZE + 1] = { 0 };
+
 DIRSTACK *dirhead = NULL;
-ALIAS *aliashead = NULL;
+ALIASLIST *aliashead = NULL;
 
 int parse(char[], char*[]);
 int wild_card(char[], char*);
@@ -38,6 +45,7 @@ int strcmp_r(char[], char[]);
 void add_history(char[]);
 void execute_command(char*[], int);
 int execute_native_command(char*[], int);
+int search_command(char[]);
 void change_directory(char[]);
 void push_directory(void);
 void dirs(void);
@@ -45,13 +53,10 @@ void pop_directory(void);
 void history(void);
 int search_history(char[]);
 void change_prompt(char[]);
-void alias(char*[]);
+void alias(char[], char[]);
 void unalias(char[]);
 char* search_alias(char[]);
-void word_count(char[]);
-void sort(char[]);
-void sort_line(char*[], int, int);
-void swap(char*[], int, int);
+void command_type(char[]);
 void clean(void);
 
 int main(void){
@@ -123,9 +128,9 @@ int parse(char buffer[], char *args[]){
 	int status = 0; /* コマンドの状態を表す */
 
 	*(buffer + (strlen(buffer) - 1)) = '\0'; //バッファ内の最後にある改行をヌル文字へ変更
-	char *idx = strchr(buffer, '#');// コメントを無視
-	if(idx!=NULL){
-		*idx='\0';
+	char *idx = strchr(buffer, '#'); // コメントを無視
+	if(idx != NULL){
+		*idx = '\0';
 	}
 
 	if(buffer[0] == '!'){ //!から始まる呼び出しをhistoryに含めないため先に実行
@@ -232,7 +237,7 @@ int wild_card(char buffer[], char *idx){
 		key[i] = '\0';
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
-				if(strncmp(dent->d_name, key, strlen(key)) == 0){
+				if(strcmp(dent->d_name, key) == 0){
 					strcat(exp, dent->d_name);
 					strcat(exp, " ");
 				}
@@ -259,6 +264,7 @@ int wild_card(char buffer[], char *idx){
 			}
 		}
 	}
+	closedir(dir);
 
 	if(strcmp(exp, "") == 0){
 		printf("could not replace\n");
@@ -385,48 +391,52 @@ void execute_command(char *args[], int command_status){
 //コマンドがmyshに存在するコマンドなら実行して1を返す
 //存在しなければ0を返す
 int execute_native_command(char *args[], int command_status){
-	if(strcmp(args[0], "cd") == 0){
-		change_directory(args[1]);
-		return 1;
-	}
-	if(strcmp(args[0], "pushd") == 0){
-		push_directory();
-		return 1;
-	}
-	if(strcmp(args[0], "dirs") == 0){
-		dirs();
-		return 1;
-	}
-	if(strcmp(args[0], "popd") == 0){
-		pop_directory();
-		return 1;
-	}
-	if(strcmp(args[0], "history") == 0){
-		history();
-		return 1;
-	}
-	if(strcmp(args[0], "prompt") == 0){
-		change_prompt(args[1]);
-		return 1;
-	}
-	if(strcmp(args[0], "alias") == 0){
-		alias(args);
-		return 1;
-	}
-	if(strcmp(args[0], "unalias") == 0){
-		unalias(args[1]);
-		return 1;
-	}
-	if(strcmp(args[0], "wc") == 0){
-		word_count(args[1]);
-		return 1;
-	}
-	if(strcmp(args[0], "sort") == 0){
-		sort(args[1]);
-		return 1;
+	int com = search_command(args[0]);
+
+	switch(com){
+		case CD:
+			change_directory(args[1]);
+			break;
+		case PUSHD:
+			push_directory();
+			break;
+		case DIRS:
+			dirs();
+			break;
+		case POPD:
+			pop_directory();
+			break;
+		case HISTORY:
+			history();
+			break;
+		case PROMPT:
+			alias(args[1], args[2]);
+			break;
+		case ALIAS:
+			unalias(args[1]);
+			break;
+		case UNALIAS:
+			change_directory(args[1]);
+			break;
+		case TYPE:
+			command_type(args[1]);
+			break;
+		default:
+			return 0;
 	}
 
-	return 0;
+	return 1;
+}
+
+int search_command(char arg[]){
+	int i;
+	for(i = 0; i < COMMANDS; ++i){
+		if(strcmp(arg, NATIVE_COMMANDS[i]) == 0){
+			return i;
+		}
+	}
+
+	return -1;
 }
 
 void change_directory(char dir[]){
@@ -449,7 +459,6 @@ void change_directory(char dir[]){
 }
 
 void push_directory(void){
-	char dir[DIRSIZE];
 	DIRSTACK *tmp;
 	if(dirhead == NULL){
 		dirhead = malloc(sizeof(DIRSTACK));
@@ -501,7 +510,6 @@ void history(void){
 }
 
 int search_history(char buffer[]){
-	int i = 0;
 	int idx = HISTORY_SIZE;
 	int num;
 
@@ -559,12 +567,11 @@ void change_prompt(char arg[]){
 	}else{
 		strcpy(prompt, arg);
 	}
-
 }
 
-void alias(char *args[]){
-	ALIAS *tmp, *end = aliashead;
-	if(args[1] == NULL){
+void alias(char command1[], char command2[]){
+	ALIASLIST *tmp, *end = aliashead;
+	if(command1 == NULL){
 		if(aliashead == NULL){
 			printf("no alias\n");
 			return;
@@ -577,31 +584,31 @@ void alias(char *args[]){
 		return;
 	}
 
-	if(args[2] == NULL){
+	if(command2 == NULL){
 		printf("no target\n");
 		return;
 	}
 
 	if(aliashead == NULL){
-		aliashead = malloc(sizeof(ALIAS));
-		strcpy(aliashead->command1, args[1]);
-		strcpy(aliashead->command2, args[2]);
+		aliashead = malloc(sizeof(ALIASLIST));
+		strcpy(aliashead->command1, command1);
+		strcpy(aliashead->command2, command2);
 		aliashead->next = NULL;
 	}else{
 		while(end->next != NULL){
 			end++;
 		}
-		tmp = malloc(sizeof(ALIAS));
-		strcpy(tmp->command1, args[1]);
-		strcpy(tmp->command2, args[2]);
+		tmp = malloc(sizeof(ALIASLIST));
+		strcpy(tmp->command1, command1);
+		strcpy(tmp->command2, command2);
 		tmp->next = NULL;
 		end->next = tmp;
 	}
 }
 
 void unalias(char arg[]){
-	ALIAS *tmp = aliashead;
-	ALIAS *prev = NULL;
+	ALIASLIST *tmp = aliashead;
+	ALIASLIST *prev = NULL;
 
 	while(tmp->next != NULL){
 		if(strcmp(tmp->command1, arg) == 0){
@@ -621,7 +628,7 @@ void unalias(char arg[]){
 }
 
 char* search_alias(char arg[]){
-	ALIAS *tmp = aliashead;
+	ALIASLIST *tmp = aliashead;
 	while(tmp != NULL){
 		if(strcmp(tmp->command1, arg) == 0){
 			return tmp->command2;
@@ -632,110 +639,47 @@ char* search_alias(char arg[]){
 	return arg;
 }
 
-void word_count(char filename[]){
-	int prev = 0; // 前の文字が区切り文字かどうか
-	int lines = 0;
-	int words = 0;
-	int bytes = 0;
-	char c;
-	FILE *fp = fopen(filename, "r");
-
-	if(fp == NULL){
-		printf("Cannot open file %s", filename);
+void command_type(char arg[]){
+	char *alias = search_alias(arg);
+	if(alias != arg){            //search_alias関数は見つからなかった時引数のアドレスをそのまま返すのでOK
+		printf("%s is aliased to \'%s\'\n", arg, alias);
 		return;
 	}
 
-	while((c = fgetc(fp)) != '\0'){
-		++bytes;
-		switch(c){
-			case '\n':
-				++lines;
-				/* no break */
-			case ' ':
-			case '.':
-			case ',':
-			case '\r':
-				if(!prev){ // 前の文字が区切り文字でなければ
-					++words; // 単語数を増やす
-				}
-				prev = 1;
-				break;
-			default:
-				prev = 0;
-				break;
-		}
-	}
-
-	printf("%8d %8d %8d %s\n", lines, words, bytes, filename);
-	fclose(fp);
-}
-
-void sort(char filename[]){
-	int cl;
-	char *line[1024];
-	FILE *fp = fopen(filename, "r");
-
-	if(fp == NULL){
-		printf("Cannot open file %s", filename);
+	if(search_command(arg) != -1){
+		printf("%s is a shell builtin\n", arg);
 		return;
 	}
 
-	for(cl = 0; cl < 1024; ++cl){
-		line[cl] = malloc(256);
-		printf("malloc\n");
-		if(fgets(line[cl], 255, fp) == NULL){
+	//外部コマンドの場所を検索
+	char paths[1024];
+	strcpy(paths, getenv("PATH"));
+	char *path = strtok(paths, ":");
+	DIR *dir;
+	struct dirent *dent;
+	do{
+		if(strstr(path, "cygdrive") != NULL){
 			break;
+		}            //Cygwin
+		dir = opendir(path);
+		if(dir == NULL){
+			continue;
 		}
-
-		*(line[cl] + (strlen(line[cl]) - 1)) = '\0';
-		puts(line[cl]);
-	}
-
-	sort_line(line, 0, cl - 1);
-
-	fclose(fp);
-	for(int i = 0; line[i] != NULL; ++i){
-		//puts(line[i]);
-		free(line[i]);
-	}
-}
-
-void sort_line(char *line[], int left, int right){
-	int i = left;
-	int j = right;
-	char *pivot = line[left + (right - left) / 2];
-
-	for(;;){
-		while(strcmp(line[i], pivot) < 0)
-			i++;
-		while(strcmp(line[j], pivot) > 0)
-			j--;
-		if(i >= j){
-			break;
+		while((dent = readdir(dir)) != NULL){
+			if(dent->d_type == DT_REG && strcmp(dent->d_name, arg) == 0){
+				printf("%s is %s/%s\n", arg, path, arg);
+				return;
+			}
 		}
+		closedir(dir);
+	}while((path = strtok(NULL, ":")) != NULL);            //PATHの次のディレクトリを代入
 
-		swap(line, i, j);
-		i++;
-		j--;
-	}
-
-	if(left < i - 1){
-		sort_line(line, left, i - 1);
-	}
-	if(j + 1 < right){
-		sort_line(line, j + 1, right);
-	}
-}
-
-void swap(char *line[], int i, int j){
-	char *tmp = line[i];
-	line[i] = line[j];
-	line[j] = tmp;
+	printf("%s: not found\n", arg);
 }
 
 void clean(void){
 	DIRSTACK *tmp1;
-	ALIAS *tmp2;
+	ALIASLIST *tmp2;
 
 	while(NULL != dirhead){
 		tmp1 = dirhead->next;
