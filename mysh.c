@@ -17,7 +17,7 @@
 #define COMMANDS      9
 
 const char *NATIVE_COMMANDS[COMMANDS] =
-		{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
+	{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
 enum commands{
 	CD, PUSHD, DIRS, POPD, HISTORY, PROMPT, ALIAS, UNALIAS, TYPE
 };
@@ -410,13 +410,13 @@ int execute_native_command(char *args[], int command_status){
 			history();
 			break;
 		case PROMPT:
-			alias(args[1], args[2]);
+			change_prompt(args[1]);
 			break;
 		case ALIAS:
-			unalias(args[1]);
+			alias(args[1], args[2]);
 			break;
 		case UNALIAS:
-			change_directory(args[1]);
+			unalias(args[1]);
 			break;
 		case TYPE:
 			command_type(args[1]);
