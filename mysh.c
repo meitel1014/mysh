@@ -15,6 +15,7 @@
 #define PROMPT_SIZE  64
 #define KEYSIZE      32
 #define COMMANDS      9
+#define PATHSIZE   1024
 
 const char *NATIVE_COMMANDS[COMMANDS] =
 	{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
@@ -225,21 +226,17 @@ int wild_card(char buffer[], char *idx){
 	//*のついた引数より後を一時コピー
 	argidx = idx;
 	//*のついた引数を読み飛ばす
-	while(*argidx != ' ' && *argidx != '\t'){
+	while(*argidx != ' ' && *argidx != '\t' && *argidx != '\0'){
 		++argidx;
 	}
 	strcpy(args, argidx);
 
 	if(*idx != '*'){ // strings*の場合
-		for(i = 0; idx[i] != '*'; ++i){
-			key[i] = idx[i];
-		}
-		key[i] = '\0';
+		sscanf(idx,"%[^*]*",key);
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
-				if(strcmp(dent->d_name, key) == 0){
-					strcat(exp, dent->d_name);
-					strcat(exp, " ");
+				if(strncmp(dent->d_name, key,strlen(key)) == 0){
+					sprintf(exp,"%s%s ",exp,dent->d_name);
 				}
 			}
 		}
@@ -251,25 +248,24 @@ int wild_card(char buffer[], char *idx){
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
 				if(strcmp_r(dent->d_name, key)){
-					strcat(exp, dent->d_name);
-					strcat(exp, " ");
+					sprintf(exp,"%s%s ",exp,dent->d_name);
 				}
 			}
 		}
 	}else{
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
-				strcat(exp, dent->d_name);
-				strcat(exp, " ");
+				sprintf(exp,"%s%s ",exp,dent->d_name);
 			}
 		}
 	}
 	closedir(dir);
-
+	sprintf(buffer,"%s%s%s",command,exp,args);
 	if(strcmp(exp, "") == 0){
 		printf("could not replace\n");
 		return 0;
 	}
+
 
 	printf("%s\n", buffer);
 	return 1;
@@ -442,7 +438,7 @@ int search_command(char arg[]){
 void change_directory(char dir[]){
 	errno = 0;
 	if(dir == NULL){
-		dir = getenv("HOME");
+		strcpy(dir,getenv("HOME"));
 	}
 
 	if(chdir(dir) == 0){
@@ -652,7 +648,7 @@ void command_type(char arg[]){
 	}
 
 	//外部コマンドの場所を検索
-	char paths[1024];
+	char paths[PATHSIZE];
 	strcpy(paths, getenv("PATH"));
 	char *path = strtok(paths, ":");
 	DIR *dir;
