@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -153,7 +154,7 @@ int parse(char buffer[], char *args[]){
 
 	idx = strchr(buffer, '*');
 	if(idx != NULL){
-		while(*(idx - 1) != ' ' && *(idx - 1) != '\t'){
+		while(idx!=buffer&&!isspace(*(idx-1))){
 			--idx;
 		}
 		//idxはbuffer内の*のついた引数の先頭を指している
@@ -240,8 +241,8 @@ int wild_card(char buffer[], char *idx){
 				}
 			}
 		}
-	}else if(*(idx + 1) != ' ' && *(idx + 1) != '\t' && *(idx + 1) != '\0'){ // *stringsの場合
-		for(i = 1; idx[i] != ' ' && idx[i] != '\t'; ++i){
+	}else if(!isspace(*(idx+1)) && *(idx + 1) != '\0'){ // *stringsの場合
+		for(i = 1; !isspace(idx[i])&&idx[i]!='\0' ; ++i){
 			key[i - 1] = idx[i];
 		}
 		key[i - 1] = '\0';
@@ -438,7 +439,8 @@ int search_command(char arg[]){
 void change_directory(char dir[]){
 	errno = 0;
 	if(dir == NULL){
-		strcpy(dir,getenv("HOME"));
+		chdir(getenv("HOME"));
+		return;
 	}
 
 	if(chdir(dir) == 0){
@@ -591,8 +593,15 @@ void alias(char command1[], char command2[]){
 		strcpy(aliashead->command2, command2);
 		aliashead->next = NULL;
 	}else{
+		if(strcmp(aliashead->command1,command1)==0){
+			strcpy(aliashead->command2, command2);//すでにあれば上書き
+		}
 		while(end->next != NULL){
-			end++;
+			if(strcmp(end->command1,command1)==0){
+				strcpy(end->command2, command2);//すでにあれば上書き
+				return;
+			}
+			end=end->next;
 		}
 		tmp = malloc(sizeof(ALIASLIST));
 		strcpy(tmp->command1, command1);
@@ -603,10 +612,15 @@ void alias(char command1[], char command2[]){
 }
 
 void unalias(char arg[]){
+	if(arg==NULL){
+		printf("No argument\n");
+		return;
+	}
+
 	ALIASLIST *tmp = aliashead;
 	ALIASLIST *prev = NULL;
 
-	while(tmp->next != NULL){
+	while(tmp != NULL){
 		if(strcmp(tmp->command1, arg) == 0){
 			if(prev == NULL){ // aliasheadが該当していたらaliasheadを移す必要あり
 				aliashead = tmp->next;
