@@ -253,7 +253,7 @@ int wild_card(char buffer[], char *idx){
 				}
 			}
 		}
-	}else{
+	}else{ // *の場合
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
 				sprintf(exp,"%s%s ",exp,dent->d_name);
@@ -262,7 +262,7 @@ int wild_card(char buffer[], char *idx){
 	}
 	closedir(dir);
 	sprintf(buffer,"%s%s%s",command,exp,args);
-	if(strcmp(exp, "") == 0){
+	if(strlen(exp) == 0){
 		printf("could not replace\n");
 		return 0;
 	}
@@ -328,35 +328,27 @@ void execute_command(char *args[], int command_status){
 	int pid; /* プロセスＩＤ */
 	int status; /* 子プロセスの終了ステータス */
 
+//	for(int i = 0; args[i] != NULL; ++i){
+//		printf("args[%d]:%s\n", i, args[i]);
+//	}
 	//myshに存在するコマンドならそちらを実行する
-
-	for(int i = 0; args[i] != NULL; ++i){
-		printf("args[%d]:%s\n", i, args[i]);
-	}
 	if(execute_native_command(args, command_status)){
 		return;
 	}
 
-	/*
-	 *  子プロセスを生成する
-	 *
-	 *  生成できたかを確認し、失敗ならばプログラムを終了する
-	 */
-
+	// 子プロセスを生成する
+	// 生成できたかを確認し、失敗ならばプログラムを終了する
 	pid = fork();
 	if(pid < 0){
 		printf("Cannot create process\n");
 		exit(1);
 	}
 
-	/*
-	 *  子プロセスの場合には引数として与えられたものを実行する
+	/*  子プロセスの場合には引数として与えられたものを実行する
 	 *
 	 *  引数の配列は以下を仮定している
 	 *  ・第１引数には実行されるプログラムを示す文字列が格納されている
-	 *  ・引数の配列はヌルポインタで終了している
-	 */
-
+	 *  ・引数の配列はヌルポインタで終了している */
 	if(pid == 0){
 		execvp(args[0], args);
 		//NOTFOUND
@@ -364,20 +356,14 @@ void execute_command(char *args[], int command_status){
 		exit(1);
 	}
 
-	/*
-	 *  コマンドの状態がバックグラウンドなら関数を抜ける
-	 */
-
+	 //  コマンドの状態がバックグラウンドなら関数を抜ける
 	if(command_status == 1){
 		return;
 	}
 
-	/*
-	 *  ここにくるのはコマンドの状態がフォアグラウンドの場合
-	 *
-	 *  親プロセスの場合に子プロセスの終了を待つ
-	 */
 
+	 // ここにくるのはコマンドの状態がフォアグラウンドの場合
+	 // 親プロセスの場合に子プロセスの終了を待つ
 	if(command_status == 0){
 		wait(&status);
 	}
@@ -447,29 +433,33 @@ void change_directory(char dir[]){
 		printf("Changed directory to %s\n", dir);
 	}else{
 		printf("Failed to change directory to %s\n", dir);
-		if(errno == ENOENT){
-			printf("%s does not exist\n", dir);
-		}
-		if(errno == EACCES){
-			printf("%s :Permission denied\n", dir);
+		switch(errno){
+		case ENOENT:
+			printf("No such file or directory\n");
+			break;
+		case EACCES:
+			printf("Permission denied\n");
+			break;
+		case ENOTDIR:
+			printf("Not a directory\n");
+			break;
+		default:
+			break;
 		}
 	}
 }
 
 void push_directory(void){
-	DIRSTACK *tmp;
 	if(dirhead == NULL){
 		dirhead = malloc(sizeof(DIRSTACK));
 		getcwd(dirhead->dir, DIRSIZE);
 		dirhead->next = NULL;
-		printf("Pushed directory %s\n", dirhead->dir);
-		return;
+	}else{
+		DIRSTACK *tmp = malloc(sizeof(DIRSTACK));
+		getcwd(tmp->dir, DIRSIZE);
+		tmp->next = dirhead;
+		dirhead = tmp;
 	}
-
-	tmp = malloc(sizeof(DIRSTACK));
-	getcwd(tmp->dir, DIRSIZE);
-	tmp->next = dirhead;
-	dirhead = tmp;
 	printf("Pushed directory %s\n", dirhead->dir);
 }
 
