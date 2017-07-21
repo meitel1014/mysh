@@ -423,7 +423,6 @@ int search_command(char arg[]){
 }
 
 void change_directory(char dir[]){
-	errno = 0;
 	if(dir == NULL){
 		chdir(getenv("HOME"));
 		return;
@@ -432,20 +431,7 @@ void change_directory(char dir[]){
 	if(chdir(dir) == 0){
 		printf("Changed directory to %s\n", dir);
 	}else{
-		printf("Failed to change directory to %s\n", dir);
-		switch(errno){
-		case ENOENT:
-			printf("No such file or directory\n");
-			break;
-		case EACCES:
-			printf("Permission denied\n");
-			break;
-		case ENOTDIR:
-			printf("Not a directory\n");
-			break;
-		default:
-			break;
-		}
+		perror("cd");
 	}
 }
 
