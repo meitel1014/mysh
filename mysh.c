@@ -19,7 +19,7 @@
 #define PATHSIZE   1024
 
 const char *NATIVE_COMMANDS[COMMANDS] =
-	{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
+		{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
 enum commands{
 	CD, PUSHD, DIRS, POPD, HISTORY, PROMPT, ALIAS, UNALIAS, TYPE
 };
@@ -71,6 +71,7 @@ int main(void){
 	 command_status = 3 : 何もしない */
 	int isscript = 0;
 
+	//スクリプトかどうかの判定
 	if(isatty(fileno(stdin)) == 0){
 		if(errno == ENOTTY){
 			isscript = 1;
@@ -154,7 +155,7 @@ int parse(char buffer[], char *args[]){
 
 	idx = strchr(buffer, '*');
 	if(idx != NULL){
-		while(idx!=buffer&&!isspace(*(idx-1))){
+		while(idx != buffer && !isspace(*(idx - 1))){
 			--idx;
 		}
 		//idxはbuffer内の*のついた引数の先頭を指している
@@ -233,40 +234,39 @@ int wild_card(char buffer[], char *idx){
 	strcpy(args, argidx);
 
 	if(*idx != '*'){ // strings*の場合
-		sscanf(idx,"%[^*]*",key);
+		sscanf(idx, "%[^*]*", key);
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
-				if(strncmp(dent->d_name, key,strlen(key)) == 0){
-					sprintf(exp,"%s%s ",exp,dent->d_name);
+				if(strncmp(dent->d_name, key, strlen(key)) == 0){
+					sprintf(exp, "%s%s ", exp, dent->d_name);
 				}
 			}
 		}
-	}else if(!isspace(*(idx+1)) && *(idx + 1) != '\0'){ // *stringsの場合
-		for(i = 1; !isspace(idx[i])&&idx[i]!='\0' ; ++i){
+	}else if(!isspace(*(idx + 1)) && *(idx + 1) != '\0'){ // *stringsの場合
+		for(i = 1; !isspace(idx[i]) && idx[i] != '\0'; ++i){
 			key[i - 1] = idx[i];
 		}
 		key[i - 1] = '\0';
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
 				if(strcmp_r(dent->d_name, key)){
-					sprintf(exp,"%s%s ",exp,dent->d_name);
+					sprintf(exp, "%s%s ", exp, dent->d_name);
 				}
 			}
 		}
 	}else{ // *の場合
 		while((dent = readdir(dir)) != NULL){
 			if(dent->d_type == DT_REG){
-				sprintf(exp,"%s%s ",exp,dent->d_name);
+				sprintf(exp, "%s%s ", exp, dent->d_name);
 			}
 		}
 	}
 	closedir(dir);
-	sprintf(buffer,"%s%s%s",command,exp,args);
+	sprintf(buffer, "%s%s%s", command, exp, args);
 	if(strlen(exp) == 0){
 		printf("could not replace\n");
 		return 0;
 	}
-
 
 	printf("%s\n", buffer);
 	return 1;
@@ -356,14 +356,13 @@ void execute_command(char *args[], int command_status){
 		exit(1);
 	}
 
-	 //  コマンドの状態がバックグラウンドなら関数を抜ける
+	//  コマンドの状態がバックグラウンドなら関数を抜ける
 	if(command_status == 1){
 		return;
 	}
 
-
-	 // ここにくるのはコマンドの状態がフォアグラウンドの場合
-	 // 親プロセスの場合に子プロセスの終了を待つ
+	// ここにくるのはコマンドの状態がフォアグラウンドの場合
+	// 親プロセスの場合に子プロセスの終了を待つ
 	if(command_status == 0){
 		wait(&status);
 	}
@@ -569,15 +568,15 @@ void alias(char command1[], char command2[]){
 		strcpy(aliashead->command2, command2);
 		aliashead->next = NULL;
 	}else{
-		if(strcmp(aliashead->command1,command1)==0){
-			strcpy(aliashead->command2, command2);//すでにあれば上書き
+		if(strcmp(aliashead->command1, command1) == 0){
+			strcpy(aliashead->command2, command2); //すでにあれば上書き
 		}
 		while(end->next != NULL){
-			if(strcmp(end->command1,command1)==0){
-				strcpy(end->command2, command2);//すでにあれば上書き
+			if(strcmp(end->command1, command1) == 0){
+				strcpy(end->command2, command2); //すでにあれば上書き
 				return;
 			}
-			end=end->next;
+			end = end->next;
 		}
 		tmp = malloc(sizeof(ALIASLIST));
 		strcpy(tmp->command1, command1);
@@ -588,8 +587,8 @@ void alias(char command1[], char command2[]){
 }
 
 void unalias(char arg[]){
-	if(arg==NULL){
-		printf("No argument\n");
+	if(arg == NULL){
+		printf("no argument\n");
 		return;
 	}
 
@@ -626,6 +625,11 @@ char* search_alias(char arg[]){
 }
 
 void command_type(char arg[]){
+	if(arg == NULL){
+		printf("no argument\n");
+		return;
+	}
+
 	char *alias = search_alias(arg);
 	if(alias != arg){            //search_alias関数は見つからなかった時引数のアドレスをそのまま返すのでOK
 		printf("%s is aliased to \'%s\'\n", arg, alias);
