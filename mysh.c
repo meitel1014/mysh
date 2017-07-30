@@ -19,7 +19,7 @@
 #define PATHSIZE   1024
 
 const char *NATIVE_COMMANDS[COMMANDS] =
-	{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
+		{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
 enum commands{
 	CD, PUSHD, DIRS, POPD, HISTORY, PROMPT, ALIAS, UNALIAS, TYPE
 };
@@ -69,17 +69,11 @@ int main(void){
 	 command_status = 1 : バックグラウンドで実行
 	 command_status = 2 : シェルの終了
 	 command_status = 3 : 何もしない */
-	int isscript = 0;
 
-	//スクリプトかどうかの判定
-	if(isatty(fileno(stdin)) == 0){
-		if(errno == ENOTTY){
-			isscript = 1;
-		}
-	}
+	atexit(clean);
 
 	for(;;){
-		if(!isscript){ //スクリプト実行中でなければ
+		if(isatty(fileno(stdin))){ //スクリプト実行中でなければ
 			printf("%s", prompt); //プロンプトを表示する
 		}
 
@@ -103,8 +97,6 @@ int main(void){
 
 		execute_command(args, command_status);		// コマンドを実行する
 	}
-
-	clean();
 	return 0;
 }
 
@@ -352,7 +344,7 @@ void execute_command(char *args[], int command_status){
 	if(pid == 0){
 		execvp(args[0], args);
 		//NOTFOUND
-		printf("Command not found\n");
+		perror(args[0]);
 		exit(1);
 	}
 
