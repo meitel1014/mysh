@@ -78,26 +78,25 @@ int main(void){
 		}
 
 		// 標準入力から１行を command_buffer へ読み込む
-		// 入力が何もなければスクリプトの終わりなのでループ脱出
+		// 入力が何もなければスクリプトの終わりなのでプログラム終了
 		if(fgets(buffer, BUFLEN, stdin) == NULL){
-			break;
+			return 0;
 		}
 
 		//  入力されたバッファ内のコマンドを解析する
 		//  返り値はコマンドの状態
 		command_status = parse(buffer, args);
 
-		//  終了コマンドならばループ脱出
+		//  終了コマンドならばプログラム終了
 		//  引数が何もなければプロンプト表示へ戻る
 		if(command_status == 2){
-			break;
+			return 0;
 		}else if(command_status == 3){
 			continue;
 		}
 
 		execute_command(args, command_status);		// コマンドを実行する
 	}
-	return 0;
 }
 
 /*----------------------------------------------------------------------------
@@ -552,28 +551,31 @@ void alias(char command1[], char command2[]){
 		return;
 	}
 
-	if(aliashead == NULL){
+	if(aliashead == NULL){ //エイリアスが一つもない場合
 		aliashead = malloc(sizeof(ALIASLIST));
 		strcpy(aliashead->command1, command1);
 		strcpy(aliashead->command2, command2);
 		aliashead->next = NULL;
-	}else{
-		if(strcmp(aliashead->command1, command1) == 0){
-			strcpy(aliashead->command2, command2); //すでにあれば上書き
-		}
-		while(end->next != NULL){
-			if(strcmp(end->command1, command1) == 0){
-				strcpy(end->command2, command2); //すでにあれば上書き
-				return;
-			}
-			end = end->next;
-		}
-		tmp = malloc(sizeof(ALIASLIST));
-		strcpy(tmp->command1, command1);
-		strcpy(tmp->command2, command2);
-		tmp->next = NULL;
-		end->next = tmp;
+		return;
 	}
+
+	if(strcmp(aliashead->command1, command1) == 0){
+		strcpy(aliashead->command2, command2); //最初にすでにあれば上書き
+		return;
+	}
+
+	while(end->next != NULL){ //エイリアスの末尾まで移動
+		if(strcmp(end->command1, command1) == 0){
+			strcpy(end->command2, command2); //2つ目以降にすでにあれば上書き
+			return;
+		}
+		end = end->next;
+	}
+	tmp = malloc(sizeof(ALIASLIST));
+	strcpy(tmp->command1, command1);
+	strcpy(tmp->command2, command2);
+	tmp->next = NULL;
+	end->next = tmp;
 }
 
 void unalias(char arg[]){
