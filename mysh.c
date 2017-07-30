@@ -15,11 +15,11 @@
 #define DIRSIZE     256
 #define PROMPT_SIZE  64
 #define KEYSIZE      32
-#define COMMANDS      9
+#define COMMANDS 9
 #define PATHSIZE   1024
 
 const char *NATIVE_COMMANDS[COMMANDS] =
-		{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
+	{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
 enum commands{
 	CD, PUSHD, DIRS, POPD, HISTORY, PROMPT, ALIAS, UNALIAS, TYPE
 };
@@ -373,9 +373,7 @@ void execute_command(char *args[], int command_status){
 //コマンドがmyshに存在するコマンドなら実行して1を返す
 //存在しなければ0を返す
 int execute_native_command(char *args[], int command_status){
-	int com = search_command(args[0]);
-
-	switch(com){
+	switch(search_command(args[0])){
 		case CD:
 			change_directory(args[1]);
 			break;
@@ -668,13 +666,13 @@ void command_type(char arg[]){
 }
 
 void clean(void){
-	DIRSTACK *tmp1;
-	ALIASLIST *tmp2;
+	DIRSTACK *dirtmp;
+	ALIASLIST *aliastmp;
 
 	while(NULL != dirhead){
-		tmp1 = dirhead->next;
+		dirtmp = dirhead->next;
 		free(dirhead);
-		dirhead = tmp1;
+		dirhead = dirtmp;
 	}
 
 	for(int i = 0; i < HISTORY_SIZE; ++i){
@@ -682,8 +680,8 @@ void clean(void){
 	}
 
 	while(NULL != aliashead){
-		tmp2 = aliashead->next;
+		aliastmp = aliashead->next;
 		free(aliashead);
-		aliashead = tmp2;
+		aliashead = aliastmp;
 	}
 }
