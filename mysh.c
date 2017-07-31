@@ -259,7 +259,6 @@ int wild_card(char buffer[], char *idx){
 		return 0;
 	}
 
-	printf("%s\n", buffer);
 	return 1;
 }
 
@@ -319,9 +318,6 @@ void execute_command(char *args[], int command_status){
 	int pid; /* プロセスＩＤ */
 	int status; /* 子プロセスの終了ステータス */
 
-//	for(int i = 0; args[i] != NULL; ++i){
-//		printf("args[%d]:%s\n", i, args[i]);
-//	}
 	//myshに存在するコマンドならそちらを実行する
 	if(execute_native_command(args, command_status)){
 		return;
@@ -510,7 +506,6 @@ int search_history(char buffer[]){
 		return 1;
 	}else{ // !string
 		while(idx >= 0){
-			printf("idx=%d\n", idx);
 			if(strncmp(command_history[idx], buffer, strlen(buffer)) == 0){
 				strcpy(buffer, command_history[idx]);
 				return 1;
