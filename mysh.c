@@ -15,11 +15,11 @@
 #define DIRSIZE     256
 #define PROMPT_SIZE  64
 #define KEYSIZE      32
-#define COMMANDS 9
+#define COMMANDS      9
 #define PATHSIZE   1024
 
 const char *NATIVE_COMMANDS[COMMANDS] =
-		{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
+	{ "cd", "pushd", "dirs", "popd", "history", "prompt", "alias", "unalias", "type" };
 enum commands{
 	CD, PUSHD, DIRS, POPD, HISTORY, PROMPT, ALIAS, UNALIAS, TYPE
 };
